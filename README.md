@@ -3,7 +3,7 @@
 ## Installation instructions (Under Lxplus)
 
 These installation instructions correspond to the muon ID scale factor production.
-To install, execute the following in your work area (need under lxplus, due to some condor issue).
+To install, execute the following in your work area (need to be under lxplus, due to some condor issue).
 
 ```
 export SCRAM_ARCH=slc7_amd64_gcc700
@@ -17,7 +17,7 @@ cd MuonIDScaleFactor/
 
 ## Download Tag and Probe ntuples
 Download the tag and probe ntuples. Suggest to download to eos directory.
-``
+```
 sh Download_ntuple.sh [Store directory]
 ```
 
