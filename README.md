@@ -1,9 +1,9 @@
 # Muon ID Scale Factor
 
-## Installation instructions (Under Lxplus)
+## Installation instructions (Under afs)
 
 These installation instructions correspond to the muon ID scale factor production.
-To install, execute the following in your work area (need to be under lxplus, due to some condor issue).
+To install, execute the following in your work area (need to be under afs, due to some condor issue).
 
 ```
 export SCRAM_ARCH=slc7_amd64_gcc700
