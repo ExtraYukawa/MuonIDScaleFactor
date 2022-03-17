@@ -1,6 +1,6 @@
-# MuonIDScaleFactor
+# Muon ID Scale Factor
 
-## Installation instructions
+## Installation instructions (Under lxplus)
 
 These installation instructions correspond to the muon ID scale factor production.
 To install, execute the following in your work area (need under lxplus, due to some condor issue).
@@ -12,9 +12,11 @@ cd CMSSW_10_6_16/src
 cmsenv
 git cms-init
 git clone https://github.com/AlbertHsuNTUphys/MuonIDScaleFactor.git
+cd MuonIDScaleFactor/
+
 ```
 
-## Running ntuple creation and checking the selection
+## Running ntuple creation
 
 The ntuplizer is steered with test/runMiniAnalyzer_cfg.py.
 It takes several options from command line (see cfg for details).
