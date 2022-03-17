@@ -9,10 +9,10 @@ def get_fname(era = '2017',isNLO = False):
 
   SingleMuon_names = ROOT.std.vector('string')()
   DY_name   = ROOT.std.vector('string')()
-  path_data = "/eos/user/t/tihsu/TnP/ntuple/"
-  path_mc   = "/eos/user/t/tihsu/TnP/ntuple/"
+  path_data = "/eos/user/t/tihsu/TnP_muon_ntuple/"
+  path_mc   = "/eos/user/t/tihsu/TnP_muon_ntuple/"
   if isNLO:
-    path_mc = "/eos/user/t/tihsu/TnP/ntuple/NLO/"
+    path_mc += "NLO/"
   dirs_data = os.listdir(path_data)
   dirs_mc   = os.listdir(path_mc)
   for fname in dirs_data:
@@ -70,24 +70,24 @@ def makehist(ptbin, etabin, SingleMuon_names, DY_name, puWeight='puWeight',outpu
   df_DY_fail = df_DY_tree_fail.Filter(filters_fail_final)
   df_DY_fail_histo = df_DY_fail.Histo1D(("TnP_mass_DYfail",title_fail_temp ,60,60,120), "TnP_mass",puWeight)
 
-  df_SingleEle_tree_pass = ROOT.RDataFrame("Events", SingleMuon_names)
-  df_SingleEle_pass = df_SingleEle_tree_pass.Filter(filters_pass_final)
-  df_SingleEle_pass_histo = df_SingleEle_pass.Histo1D(("TnP_mass_EGpass",title_pass_temp,60,60,120), "TnP_mass")
+  df_SingleMuon_tree_pass = ROOT.RDataFrame("Events", SingleMuon_names)
+  df_SingleMuon_pass = df_SingleMuon_tree_pass.Filter(filters_pass_final)
+  df_SingleMuon_pass_histo = df_SingleMuon_pass.Histo1D(("TnP_mass_Muonpass",title_pass_temp,60,60,120), "TnP_mass")
 
-  df_SingleEle_tree_fail = ROOT.RDataFrame("Events", SingleMuon_names)
-  df_SingleEle_fail = df_SingleEle_tree_fail.Filter(filters_fail_final)
-  df_SingleEle_fail_histo = df_SingleEle_fail.Histo1D(("TnP_mass_EGfail",title_fail_temp,60,60,120), "TnP_mass")
+  df_SingleMuon_tree_fail = ROOT.RDataFrame("Events", SingleMuon_names)
+  df_SingleMuon_fail = df_SingleMuon_tree_fail.Filter(filters_fail_final)
+  df_SingleMuon_fail_histo = df_SingleMuon_fail.Histo1D(("TnP_mass_Muonfail",title_fail_temp,60,60,120), "TnP_mass")
 
   df_DY_pass_histo.Draw()
   df_DY_fail_histo.Draw()
-  df_SingleEle_pass_histo.Draw()
-  df_SingleEle_fail_histo.Draw()
+  df_SingleMuon_pass_histo.Draw()
+  df_SingleMuon_fail_histo.Draw()
 
   fileout.cd()
   df_DY_pass_histo.Write()
   df_DY_fail_histo.Write()
-  df_SingleEle_pass_histo.Write()
-  df_SingleEle_fail_histo.Write()
+  df_SingleMuon_pass_histo.Write()
+  df_SingleMuon_fail_histo.Write()
 
   fileout.Close()
 

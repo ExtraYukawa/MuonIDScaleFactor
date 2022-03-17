@@ -18,21 +18,21 @@ def muSF(fitType,ismc,filename):
   
   dy_pass=ROOT.TH1D()
   dy_fail=ROOT.TH1D()
-  EG_pass=ROOT.TH1D()
-  EG_fail=ROOT.TH1D()
+  Muon_pass=ROOT.TH1D()
+  Muon_fail=ROOT.TH1D()
   filein.GetObject("TnP_mass_DYpass",dy_pass)
   filein.GetObject("TnP_mass_DYfail",dy_fail)
-  filein.GetObject("TnP_mass_EGpass",EG_pass)
-  filein.GetObject("TnP_mass_EGfail",EG_fail)
+  filein.GetObject("TnP_mass_Muonpass",Muon_pass)
+  filein.GetObject("TnP_mass_Muonfail",Muon_fail)
   
   DY_pass_error=ROOT.Double(0.)
   DY_fail_error=ROOT.Double(0.)
-  EG_pass_error=ROOT.Double(0.)
-  EG_fail_error=ROOT.Double(0.)
+  Muon_pass_error=ROOT.Double(0.)
+  Muon_fail_error=ROOT.Double(0.)
   DY_pass_total=dy_pass.IntegralAndError(1,60,DY_pass_error)
   DY_fail_total=dy_fail.IntegralAndError(1,60,DY_fail_error)
-  EG_pass_total=EG_pass.IntegralAndError(1,60,EG_pass_error)
-  EG_fail_total=EG_fail.IntegralAndError(1,60,EG_fail_error)
+  Muon_pass_total=Muon_pass.IntegralAndError(1,60,Muon_pass_error)
+  Muon_fail_total=Muon_fail.IntegralAndError(1,60,Muon_fail_error)
  
   w = ROOT.RooWorkspace() 
   w.factory("x[61,119]")
@@ -43,8 +43,8 @@ def muSF(fitType,ismc,filename):
   # make RootDataHist 
   GenPass = ROOT.RooDataHist("GenPass","GenPass",ROOT.RooArgList(x),dy_pass)
   GenFail = ROOT.RooDataHist("GenFail","GenFail",ROOT.RooArgList(x),dy_fail)
-  DataPass = ROOT.RooDataHist("DataPass","DataPass",ROOT.RooArgList(x),EG_pass)
-  DataFail = ROOT.RooDataHist("DataFail","DataFail",ROOT.RooArgList(x),EG_fail)
+  DataPass = ROOT.RooDataHist("DataPass","DataPass",ROOT.RooArgList(x),Muon_pass)
+  DataFail = ROOT.RooDataHist("DataFail","DataFail",ROOT.RooArgList(x),Muon_fail)
   
   ZPassShape = ROOT.RooHistPdf("ZPassShape","ZPassShape",ROOT.RooArgSet(x), GenPass)
   ZFailShape = ROOT.RooHistPdf("ZFailShape","ZFailShape",ROOT.RooArgSet(x), GenFail)
@@ -106,11 +106,11 @@ def muSF(fitType,ismc,filename):
     bkgP = w.pdf('bkgP')
     bkgF = w.pdf('bkgF')
  
-  nSigP = ROOT.RooRealVar("nSigP","nSigP",0.9*EG_pass_total,0.5*EG_pass_total,1.5*EG_pass_total)
-  nBkgP = ROOT.RooRealVar("nBkgP","nBkgP",0.1*EG_pass_total,0.,1.5*EG_pass_total)
+  nSigP = ROOT.RooRealVar("nSigP","nSigP",0.9*Muon_pass_total,0.5*Muon_pass_total,1.5*Muon_pass_total)
+  nBkgP = ROOT.RooRealVar("nBkgP","nBkgP",0.1*Muon_pass_total,0.,1.5*Muon_pass_total)
   
-  nSigF = ROOT.RooRealVar("nSigF","nSigF",0.9*EG_fail_total,0.5*EG_fail_total,1.5*EG_fail_total)
-  nBkgF = ROOT.RooRealVar("nBkgF","nBkgF",0.1*EG_fail_total,0.,1.5*EG_fail_total)
+  nSigF = ROOT.RooRealVar("nSigF","nSigF",0.9*Muon_fail_total,0.5*Muon_fail_total,1.5*Muon_fail_total)
+  nBkgF = ROOT.RooRealVar("nBkgF","nBkgF",0.1*Muon_fail_total,0.,1.5*Muon_fail_total)
   
   modelP=ROOT.RooAddPdf("modelP","modelP", ROOT.RooArgList(sig_pass,bkgP), ROOT.RooArgList(nSigP,nBkgP))
   modelF=ROOT.RooAddPdf("modelF","modelF", ROOT.RooArgList(sig_fail,bkgF), ROOT.RooArgList(nSigF,nBkgF))
@@ -356,9 +356,9 @@ def get_sys(h_nominal,h_sys,hname,plotDir):
   return h_syserr
 
 if __name__ == "__main__":
-  ntupleDir = "/afs/cern.ch/user/t/tihsu/TnP_condor/CMSSW_10_6_16/src/flatten/"
-  plotDir = "./"
-  eras = ["2017","2018"]
+  ntupleDir = "/afs/cern.ch/user/t/tihsu/ExYukawa/CMSSW_10_6_16/src/MuonIDSclaeFactor/flatten/"
+  plotDir = "plot"
+  eras = ["apv2016","2016","2017","2018"]
   for era in eras:
     #h_here = produce_SF(["Nominal"],"./","./","here")
     h_nominal = produce_SF(["Nominal"],ntupleDir+"/%s/puWeight/LO/"%era,plotDir,"nominal_%s"%era)
