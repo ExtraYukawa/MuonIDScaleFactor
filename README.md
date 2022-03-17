@@ -16,7 +16,7 @@ cd MuonIDScaleFactor/
 ```
 
 ## Download Tag and Probe ntuples
-Download the tag and probe ntuples. Suggest to download to eos directory.
+Download the tag and probe ntuples. 
 ```
 sh Download_ntuple.sh [Store directory]
 ```
