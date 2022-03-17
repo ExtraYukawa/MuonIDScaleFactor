@@ -3,8 +3,7 @@
 ## Installation instructions
 
 These installation instructions correspond to the muon ID scale factor production.
-To install execute the following in your work area.
-If compilation fails for some reason repeat the scram b...
+To install, execute the following in your work area (need under lxplus, due to some condor issue).
 
 ```
 export SCRAM_ARCH=slc7_amd64_gcc700
