@@ -3,15 +3,17 @@ ROOT.gROOT.LoadMacro('./RooCMSShape.cc+')
 ROOT.gROOT.LoadMacro('./RooCBExGaussShape.cc+')
 
 from math import sqrt
-from ROOT import RooCMSShape,TCanvas, TPad
+from ROOT import RooCMSShape,TCanvas, TPad, RooCBExGaussShape
 import CMSTDRStyle
 CMSTDRStyle.setTDRStyle().cd()
 import CMSstyle
 from array import array
+import re
 
 def muSF(fitType,ismc,filename):
 
 #  filein=ROOT.TFile("./Pt10To20Etam0p0Top0p8.root","READ")
+  print("Processing %s"%filename)
   filein=ROOT.TFile(filename,"READ")
   
   dy_pass=ROOT.TH1D()
@@ -31,8 +33,11 @@ def muSF(fitType,ismc,filename):
   DY_fail_total=dy_fail.IntegralAndError(1,60,DY_fail_error)
   EG_pass_total=EG_pass.IntegralAndError(1,60,EG_pass_error)
   EG_fail_total=EG_fail.IntegralAndError(1,60,EG_fail_error)
-  
-  x = ROOT.RooRealVar("x", "x", 60, 120)
+ 
+  w = ROOT.RooWorkspace() 
+  w.factory("x[61,119]")
+  x = w.var('x')
+#  x = ROOT.RooRealVar("x", "x", 60, 120)
   x.setRange("FitRange", 61, 119)
   
   # make RootDataHist 
@@ -54,25 +59,22 @@ def muSF(fitType,ismc,filename):
   gauss_Fail = ROOT.RooGaussian("gaussF", "gaussian Reg", x, meanFail, sigmaFail)
 
   # Alternative signal model with RooCBExGaussShape smearing
-  meanP    = ROOT.RooRealVar("meanP", "mean",-0.0,-5.0,5.0)
-  sigmaP   = ROOT.RooRealVar("sigmaP", "sigma",1,0.001,6.0)
-  alphaP   = ROOT.RooRealVar("alphaP", "alpha",2.0,1.2,3.5)
-  nP       = ROOT.RooRealVar("nP","n",3,-5,5)
-  sigmaP_2 = ROOT.RooRealVar("sigmaP_2","sigma_2",1.5,0.5,6.0)
-  sosP     = ROOT.RooRealVar("sosP","sos",1,0.5,5.0)
-  fracP     = ROOT.RooRealVar("fracP","frac",1.0)
-
-  meanF    = ROOT.RooRealVar("meanF", "mean",-0.0,-5.0,5.0)
-  sigmaF   = ROOT.RooRealVar("sigmaF", "sigma",1,0.001,6.0)
-  alphaF   = ROOT.RooRealVar("alphaF", "alpha",2.0,1.2,3.5)
-  nF       = ROOT.RooRealVar("nF","n",3,-5,5)
-  sigmaF_2 = ROOT.RooRealVar("sigmaF_2","sigma_2",1.5,0.5,6.0)
-  sosF     = ROOT.RooRealVar("sosF","sos",1,0.5,5.0)
-  fracF     = ROOT.RooRealVar("fracF","frac",1.0)
-
+  tnpAltSigFit = [
+   "meanP[-0.0, -5.0, 5.0]", "sigmaP[1, 0.7, 6.0]",
+   "alphaP[2.0, 1.2, 3.5]",
+   'nP[3, -5, 5]', "sigmaP_2[1.5, 0.5, 6.0]", "sosP[1, 0.5, 5.0]",
+   "meanF[-0.0, -5.0, 5.0]", "sigmaF[2, 0.7, 15.0]",
+   "alphaF[2.0, 1.2, 3.5]",
+   'nF[3, -5, 5]', "sigmaF_2[2.0, 0.5, 6.0]", "sosF[1, 0.5, 5.0]",
+   "tailLeft[1]",
+   "RooCBExGaussShape::sigResPass(x,meanP,expr('sqrt(sigmaP*sigmaP+sosP*sosP)',{sigmaP,sosP}),alphaP,nP, expr('sqrt(sigmaP_2*sigmaP_2+sosP*sosP)',{sigmaP_2,sosP}),tailLeft)",
+   "RooCBExGaussShape::sigResFail(x,meanF,expr('sqrt(sigmaF*sigmaF+sosF*sosF)',{sigmaF,sosF}),alphaF,nF, expr('sqrt(sigmaF_2*sigmaF_2+sosF*sosF)',{sigmaF_2,sosF}),tailLeft)"
+ ]
+  for var in tnpAltSigFit:
+    w.factory(var)
   if 'AltSignal' in fitType:
-    gauss_Pass = RooCBExGaussShape("gaussP","gaussian Reg",x,meanP,expr('sqrt(sigmaP*sigmaP+sosP*sosP)',{sigmaP,sosP}),alphaP,nP, expr('sqrt(sigmaP_2*sigmaP_2+sosP*sosP)',{sigmaP_2,sosP}),fracP)
-    gauss_Fail = RooCBExGaussShape("gaussF","gaussian Reg",x,meanF,expr('sqrt(sigmaF*sigmaF+sosF*sosF)',{sigmaF,sosF}),alphaF,nP, expr('sqrt(sigmaP_2*sigmaF_2+sosF*sosF)',{sigmaF_2,sosF}),fracF)
+    gauss_Pass = w.pdf('sigResPass')
+    gauss_Fail = w.pdf('sigResFail')
   
   sig_pass = ROOT.RooFFTConvPdf("sigP", "signal shape", x, ZPassShape, gauss_Pass)
   sig_fail = ROOT.RooFFTConvPdf("sigF", "signal shape", x, ZFailShape, gauss_Fail)
@@ -91,8 +93,19 @@ def muSF(fitType,ismc,filename):
   peakF = ROOT.RooRealVar("peakF", "peak", 90.0)
 
   bkgF = RooCMSShape("bkgF", "bkg shape", x, acmsF, betaF, gammaF, peakF)
-  
-  
+
+  tnpAltBkgFit = [
+    "AlphaP[0., -5., 5.]",
+    "AlphaF[0., -5., 5.]",
+    "Exponential::bkgP(x, AlphaP)",
+    "Exponential::bkgF(x, AlphaF)",
+  ]
+  for var in tnpAltBkgFit:
+    w.factory(var)
+  if 'AltBkg' in fitType:
+    bkgP = w.pdf('bkgP')
+    bkgF = w.pdf('bkgF')
+ 
   nSigP = ROOT.RooRealVar("nSigP","nSigP",0.9*EG_pass_total,0.5*EG_pass_total,1.5*EG_pass_total)
   nBkgP = ROOT.RooRealVar("nBkgP","nBkgP",0.1*EG_pass_total,0.,1.5*EG_pass_total)
   
@@ -189,244 +202,65 @@ def muSF(fitType,ismc,filename):
   text1.Draw()
   text2.Draw()
   if ismc:
-    c1.SaveAs("mc_"+filename+".png")
+    c1.SaveAs(filename+"_mc.png")
   else:
-    c1.SaveAs("data_"+filename+".png")
+    c1.SaveAs(filename+"_data.png")
 
   return eff, e_eff
 
-if __name__ == "__main__":
-
+def produce_SF(fitType,inputDir,plotDir,tag):
   tdptbin=array('d',[10,20,35,50,100,200,500])
   tdptbin_plain=array('d',[1,2,3,4,5,6,7])
   tdptbinname=['10~20','20~35','35~50','50~100','100~200','200~500']
   tdetabin=array('d',[0.0,0.8,1.4442,1.566,2.0,2.5])
 
-  h2_SF = ROOT.TH2D('EleIDSF', 'EleIDSF', 6, tdptbin_plain, 5, tdetabin)
+  h2_SF = ROOT.TH2D('muIDSF', 'muIDSF', 6, tdptbin_plain, 5, tdetabin)
   h2_SF.Sumw2()
   h2_SF.SetStats(0)
-  h2_SF.GetXaxis().SetTitle('Electron P_{T} [GeV]')
-  h2_SF.GetYaxis().SetTitle('Electron #||{#eta}')
+  h2_SF.GetXaxis().SetTitle('Muon P_{T} [GeV]')
+  h2_SF.GetYaxis().SetTitle('Muon #||{#eta}')
   h2_SF.SetTitle('')
   for ib in range(1,7):
     h2_SF.GetXaxis().SetBinLabel(ib,tdptbinname[ib-1])
 
-  h2_data = ROOT.TH2D('EleIDDataEff', 'EleIDDataEff', 6, tdptbin, 5, tdetabin)
+  h2_data = ROOT.TH2D('muIdSF', 'muIdSF', 6, tdptbin, 5, tdetabin)
   h2_data.Sumw2()
   h2_data.SetStats(0)
-  h2_data.GetXaxis().SetTitle('Electron P_{T} [GeV]')
-  h2_data.GetYaxis().SetTitle('Electron #||{#eta}')
+  h2_data.GetXaxis().SetTitle('Muon P_{T} [GeV]')
+  h2_data.GetYaxis().SetTitle('Muon #||{#eta}')
   h2_data.SetTitle('')
 
-  h2_mc = ROOT.TH2D('EleIDMCEff', 'EleIDMCEff', 6, tdptbin, 5, tdetabin)
+  h2_mc = ROOT.TH2D('muIDMCEff', 'muIDMCEff', 6, tdptbin, 5, tdetabin)
   h2_mc.Sumw2()
   h2_mc.SetStats(0)
-  h2_mc.GetXaxis().SetTitle('Electron P_{T} [GeV]')
-  h2_mc.GetYaxis().SetTitle('Electron #||{#eta}')
+  h2_mc.GetXaxis().SetTitle('Muon P_{T} [GeV]')
+  h2_mc.GetYaxis().SetTitle('Muon #||{#eta}')
   h2_mc.SetTitle('')
 
   ptbinnames=['Pt10To20','Pt20To35','Pt35To50','Pt50To100','Pt100To200','Pt200To500']
   etabinnames=['Etam0p0Top0p8','Etap0p8Top1p4442','Etap1p4442Top1p566','Etap1p566Top2p0','Etap2p0Top2p5']
 
-  for files in os.listdir('./'):
+  for files in os.listdir(inputDir):
     if not (files.startswith('Pt') and files.endswith('.root')):continue
-    eff,eff_err = muSF(['AltSig'],0,files)
-    if ptbinnames[0] in files:
-      if etabinnames[0] in files:
-        h2_data.SetBinContent(1,1,eff)
-        h2_data.SetBinError(1,1,eff_err)
-      if etabinnames[1] in files:
-        h2_data.SetBinContent(1,2,eff)
-        h2_data.SetBinError(1,2,eff_err)
-      if etabinnames[2] in files:
-        h2_data.SetBinContent(1,3,eff)
-        h2_data.SetBinError(1,3,eff_err)
-      if etabinnames[3] in files:
-        h2_data.SetBinContent(1,4,eff)
-        h2_data.SetBinError(1,4,eff_err)
-      if etabinnames[4] in files:
-        h2_data.SetBinContent(1,5,eff)
-        h2_data.SetBinError(1,5,eff_err)
-    if ptbinnames[1] in files:
-      if etabinnames[0] in files:
-        h2_data.SetBinContent(2,1,eff)
-        h2_data.SetBinError(2,1,eff_err)
-      if etabinnames[1] in files:
-        h2_data.SetBinContent(2,2,eff)
-        h2_data.SetBinError(2,2,eff_err)
-      if etabinnames[2] in files:
-        h2_data.SetBinContent(2,3,eff)
-        h2_data.SetBinError(2,3,eff_err)
-      if etabinnames[3] in files:
-        h2_data.SetBinContent(2,4,eff)
-        h2_data.SetBinError(2,4,eff_err)
-      if etabinnames[4] in files:
-        h2_data.SetBinContent(2,5,eff)
-        h2_data.SetBinError(2,5,eff_err)
-    if ptbinnames[2] in files:
-      if etabinnames[0] in files:
-        h2_data.SetBinContent(3,1,eff)
-        h2_data.SetBinError(3,1,eff_err)
-      if etabinnames[1] in files:
-        h2_data.SetBinContent(3,2,eff)
-        h2_data.SetBinError(3,2,eff_err)
-      if etabinnames[2] in files:
-        h2_data.SetBinContent(3,3,eff)
-        h2_data.SetBinError(3,3,eff_err)
-      if etabinnames[3] in files:
-        h2_data.SetBinContent(3,4,eff)
-        h2_data.SetBinError(3,4,eff_err)
-      if etabinnames[4] in files:
-        h2_data.SetBinContent(3,5,eff)
-        h2_data.SetBinError(3,5,eff_err)
-    if ptbinnames[3] in files:
-      if etabinnames[0] in files:
-        h2_data.SetBinContent(4,1,eff)
-        h2_data.SetBinError(4,1,eff_err)
-      if etabinnames[1] in files:
-        h2_data.SetBinContent(4,2,eff)
-        h2_data.SetBinError(4,2,eff_err)
-      if etabinnames[2] in files:
-        h2_data.SetBinContent(4,3,eff)
-        h2_data.SetBinError(4,3,eff_err)
-      if etabinnames[3] in files:
-        h2_data.SetBinContent(4,4,eff)
-        h2_data.SetBinError(4,4,eff_err)
-      if etabinnames[4] in files:
-        h2_data.SetBinContent(4,5,eff)
-        h2_data.SetBinError(4,5,eff_err)
-    if ptbinnames[4] in files:
-      if etabinnames[0] in files:
-        h2_data.SetBinContent(5,1,eff)
-        h2_data.SetBinError(5,1,eff_err)
-      if etabinnames[1] in files:
-        h2_data.SetBinContent(5,2,eff)
-        h2_data.SetBinError(5,2,eff_err)
-      if etabinnames[2] in files:
-        h2_data.SetBinContent(5,3,eff)
-        h2_data.SetBinError(5,3,eff_err)
-      if etabinnames[3] in files:
-        h2_data.SetBinContent(5,4,eff)
-        h2_data.SetBinError(5,4,eff_err)
-      if etabinnames[4] in files:
-        h2_data.SetBinContent(5,5,eff)
-        h2_data.SetBinError(5,5,eff_err)
-    if ptbinnames[5] in files:
-      if etabinnames[0] in files:
-        h2_data.SetBinContent(6,1,eff)
-        h2_data.SetBinError(6,1,eff_err)
-      if etabinnames[1] in files:
-        h2_data.SetBinContent(6,2,eff)
-        h2_data.SetBinError(6,2,eff_err)
-      if etabinnames[2] in files:
-        h2_data.SetBinContent(6,3,eff)
-        h2_data.SetBinError(6,3,eff_err)
-      if etabinnames[3] in files:
-        h2_data.SetBinContent(6,4,eff)
-        h2_data.SetBinError(6,4,eff_err)
-      if etabinnames[4] in files:
-        h2_data.SetBinContent(6,5,eff)
-        h2_data.SetBinError(6,5,eff_err)
 
-    eff_mc, eff_err_mc = muSF(['AltSignal'],1,files)
-    if ptbinnames[0] in files:
-      if etabinnames[0] in files:
-        h2_mc.SetBinContent(1,1,eff_mc)
-        h2_mc.SetBinError(1,1,eff_err_mc)
-      if etabinnames[1] in files:
-        h2_mc.SetBinContent(1,2,eff_mc)
-        h2_mc.SetBinError(1,2,eff_err_mc)
-      if etabinnames[2] in files:
-        h2_mc.SetBinContent(1,3,eff_mc)
-        h2_mc.SetBinError(1,3,eff_err_mc)
-      if etabinnames[3] in files:
-        h2_mc.SetBinContent(1,4,eff_mc)
-        h2_mc.SetBinError(1,4,eff_err_mc)
-      if etabinnames[4] in files:
-        h2_mc.SetBinContent(1,5,eff_mc)
-        h2_mc.SetBinError(1,5,eff_err_mc)
-    if ptbinnames[1] in files:
-      if etabinnames[0] in files:
-        h2_mc.SetBinContent(2,1,eff_mc)
-        h2_mc.SetBinError(2,1,eff_err_mc)
-      if etabinnames[1] in files:
-        h2_mc.SetBinContent(2,2,eff_mc)
-        h2_mc.SetBinError(2,2,eff_err_mc)
-      if etabinnames[2] in files:
-        h2_mc.SetBinContent(2,3,eff_mc)
-        h2_mc.SetBinError(2,3,eff_err_mc)
-      if etabinnames[3] in files:
-        h2_mc.SetBinContent(2,4,eff_mc)
-        h2_mc.SetBinError(2,4,eff_err_mc)
-      if etabinnames[4] in files:
-        h2_mc.SetBinContent(2,5,eff_mc)
-        h2_mc.SetBinError(2,5,eff_err_mc)
-    if ptbinnames[2] in files:
-      if etabinnames[0] in files:
-        h2_mc.SetBinContent(3,1,eff_mc)
-        h2_mc.SetBinError(3,1,eff_err_mc)
-      if etabinnames[1] in files:
-        h2_mc.SetBinContent(3,2,eff_mc)
-        h2_mc.SetBinError(3,2,eff_err_mc)
-      if etabinnames[2] in files:
-        h2_mc.SetBinContent(3,3,eff_mc)
-        h2_mc.SetBinError(3,3,eff_err_mc)
-      if etabinnames[3] in files:
-        h2_mc.SetBinContent(3,4,eff_mc)
-        h2_mc.SetBinError(3,4,eff_err_mc)
-      if etabinnames[4] in files:
-        h2_mc.SetBinContent(3,5,eff_mc)
-        h2_mc.SetBinError(3,5,eff_err_mc)
-    if ptbinnames[3] in files:
-      if etabinnames[0] in files:
-        h2_mc.SetBinContent(4,1,eff_mc)
-        h2_mc.SetBinError(4,1,eff_err_mc)
-      if etabinnames[1] in files:
-        h2_mc.SetBinContent(4,2,eff_mc)
-        h2_mc.SetBinError(4,2,eff_err_mc)
-      if etabinnames[2] in files:
-        h2_mc.SetBinContent(4,3,eff_mc)
-        h2_mc.SetBinError(4,3,eff_err_mc)
-      if etabinnames[3] in files:
-        h2_mc.SetBinContent(4,4,eff_mc)
-        h2_mc.SetBinError(4,4,eff_err_mc)
-      if etabinnames[4] in files:
-        h2_mc.SetBinContent(4,5,eff_mc)
-        h2_mc.SetBinError(4,5,eff_err_mc)
-    if ptbinnames[4] in files:
-      if etabinnames[0] in files:
-        h2_mc.SetBinContent(5,1,eff_mc)
-        h2_mc.SetBinError(5,1,eff_err_mc)
-      if etabinnames[1] in files:
-        h2_mc.SetBinContent(5,2,eff_mc)
-        h2_mc.SetBinError(5,2,eff_err_mc)
-      if etabinnames[2] in files:
-        h2_mc.SetBinContent(5,3,eff_mc)
-        h2_mc.SetBinError(5,3,eff_err_mc)
-      if etabinnames[3] in files:
-        h2_mc.SetBinContent(5,4,eff_mc)
-        h2_mc.SetBinError(5,4,eff_err_mc)
-      if etabinnames[4] in files:
-        h2_mc.SetBinContent(5,5,eff_mc)
-        h2_mc.SetBinError(5,5,eff_err_mc)
-    if ptbinnames[5] in files:
-      if etabinnames[0] in files:
-        h2_mc.SetBinContent(6,1,eff_mc)
-        h2_mc.SetBinError(6,1,eff_err_mc)
-      if etabinnames[1] in files:
-        h2_mc.SetBinContent(6,2,eff_mc)
-        h2_mc.SetBinError(6,2,eff_err_mc)
-      if etabinnames[2] in files:
-        h2_mc.SetBinContent(6,3,eff_mc)
-        h2_mc.SetBinError(6,3,eff_err_mc)
-      if etabinnames[3] in files:
-        h2_mc.SetBinContent(6,4,eff_mc)
-        h2_mc.SetBinError(6,4,eff_err_mc)
-      if etabinnames[4] in files:
-        h2_mc.SetBinContent(6,5,eff_mc)
-        h2_mc.SetBinError(6,5,eff_err_mc)
+    eff,eff_err = muSF(fitType,0,inputDir+files)
+    for i in range(len(ptbinnames)):
+      for j in range(len(etabinnames)):
+        if (ptbinnames[i] in files) and (etabinnames[j] in files):
+          print(files)
+          h2_data.SetBinContent(i+1,j+1,eff)
+          h2_data.SetBinError(i+1,j+1,eff_err)
 
+    eff_mc, eff_err_mc = muSF(fitType,1,inputDir+files)
+    for i in range(len(ptbinnames)):
+      for j in range(len(etabinnames)):
+        if (ptbinnames[i] in files) and (etabinnames[j] in files):
+          print(i,j,eff_mc,eff_err_mc)
+          h2_mc.SetBinContent(i+1,j+1,eff_mc)
+          h2_mc.SetBinError(i+1,j+1,eff_err_mc)
+  print(h2_data.GetBinContent(1,1))
   h2_data.Divide(h2_mc)
+  print(h2_data.GetBinContent(1,1))
   for ix in range(h2_data.GetNbinsX()):
     for iy in range(h2_data.GetNbinsY()):
       h2_SF.SetBinContent(ix+1,iy+1,h2_data.GetBinContent(ix+1,iy+1))
@@ -441,8 +275,8 @@ if __name__ == "__main__":
   pad1.SetRightMargin(0.15)
   c1.SetGridx(False);
   c1.SetGridy(False);
-  c1.SaveAs('./SF.png')
-  c1.SaveAs('./SF.pdf')
+  c1.SaveAs('%s/SF_%s.png'%(plotDir,tag))
+  c1.SaveAs('%s/SF_%s.pdf'%(plotDir,tag))
   pad1.Close()
 
   c2 = TCanvas()
@@ -454,11 +288,182 @@ if __name__ == "__main__":
   pad2.SetRightMargin(0.15)
   c2.SetGridx(False);
   c2.SetGridy(False);
-  c2.SaveAs('./SF_plainX.png')
-  c2.SaveAs('./SF_plainX.pdf')
+  c2.SaveAs('%s/SF_plainX_%s.png'%(plotDir,tag))
+  c2.SaveAs('%s/SF_plainX_%s.pdf'%(plotDir,tag))
+  pad2.Close()
+  return h2_data
+
+def get_sys(h_nominal,h_sys,hname,plotDir):
+  tdptbin=array('d',[10,20,35,50,100,200,500])
+  tdptbin_plain=array('d',[1,2,3,4,5,6,7])
+  tdptbinname=['10~20','20~35','35~50','50~100','100~200','200~500']
+  tdetabin=array('d',[0.0,0.8,1.4442,1.566,2.0,2.5])
+
+  nbinX = h_nominal.GetNbinsX()
+  nbinY = h_nominal.GetNbinsY()
+  h_syserr = ROOT.TH2D(hname, hname, nbinX, tdptbin, nbinY, tdetabin)
+  h_syserr_plain = ROOT.TH2D(hname+"_plain", hname+"_plain", nbinX, tdptbin_plain, nbinY, tdetabin)
+
+  h_syserr.SetStats(0)
+  h_syserr.GetXaxis().SetTitle('Muon P_{T} [GeV]')
+  h_syserr.GetYaxis().SetTitle('Muon #||{#eta}')
+  h_syserr.SetTitle('')
+
+  h_syserr_plain.SetStats(0)
+  h_syserr_plain.GetXaxis().SetTitle('Muon P_{T} [GeV]')
+  h_syserr_plain.GetYaxis().SetTitle('Muon #||{#eta}')
+  h_syserr_plain.SetTitle('')
+  for ib in range(1,7):
+    h_syserr_plain.GetXaxis().SetBinLabel(ib,tdptbinname[ib-1])
+
+  for i in range(nbinX):
+    for j in range(nbinY):
+      err = 0.
+      for h in h_sys:
+        print(h.GetBinContent(i+1,j+1),h_nominal.GetBinContent(i+1,j+1))
+        err += abs(h.GetBinContent(i+1,j+1)-h_nominal.GetBinContent(i+1,j+1))
+      err = err/float(len(h_sys))
+      print(i,j,err)
+      h_syserr.SetBinContent(i+1,j+1,err)
+      h_syserr_plain.SetBinContent(i+1,j+1,err)
+
+  c1 = TCanvas()
+  pad1 = TPad()
+  pad1.Draw()
+  pad1.cd()
+  h_syserr.Draw('COLZ TEXT')
+  CMSstyle.SetStyle(pad1)
+  pad1.SetRightMargin(0.15)
+  c1.SetGridx(False);
+  c1.SetGridy(False);
+  c1.SaveAs('%s/sys_%s.png'%(plotDir,hname))
+  c1.SaveAs('%s/sys_%s.pdf'%(plotDir,hname))
+  pad1.Close()
+
+  c2 = TCanvas()
+  pad2 = TPad()
+  pad2.Draw()
+  pad2.cd()
+  h_syserr_plain.Draw('COLZ TEXT')
+  CMSstyle.SetStyle(pad2)
+  pad2.SetRightMargin(0.15)
+  c2.SetGridx(False);
+  c2.SetGridy(False);
+  c2.SaveAs('%s/sys_plainX_%s.png'%(plotDir,hname))
+  c2.SaveAs('%s/sys_plainX_%s.pdf'%(plotDir,hname))
   pad2.Close()
 
-  fout = ROOT.TFile('output.root','recreate')
-  fout.cd()
-  h2_data.Write()
-  fout.Close()
+  return h_syserr
+
+if __name__ == "__main__":
+  ntupleDir = "/afs/cern.ch/user/t/tihsu/TnP_condor/CMSSW_10_6_16/src/flatten/"
+  plotDir = "./"
+  eras = ["2017","2018"]
+  for era in eras:
+    #h_here = produce_SF(["Nominal"],"./","./","here")
+    h_nominal = produce_SF(["Nominal"],ntupleDir+"/%s/puWeight/LO/"%era,plotDir,"nominal_%s"%era)
+    h_puUp    = produce_SF(["Nominal"],ntupleDir+"/%s/puWeightUp/LO/"%era,plotDir,"puUp_%s"%era)
+    h_puDown  = produce_SF(["Nominal"],ntupleDir+"/%s/puWeightDown/LO/"%era,plotDir,"puDown_%s"%era)
+    h_AltSig  = produce_SF(["AltSignal"],ntupleDir+"/%s/puWeight/LO/"%era,plotDir,"AltSignal_%s"%era)
+    h_AltBkg  = produce_SF(["AltBkg"],ntupleDir+"/%s/puWeight/LO/"%era,plotDir,"AltBkg_%s"%era)
+    h_NLO     = produce_SF(["Nominal"],ntupleDir+"/%s/puWeight/NLO/"%era,plotDir,"NLO_%s"%era)
+    h_pu_sys     = get_sys(h_nominal,[h_puUp,h_puDown],"pu_%s"%era,plotDir)
+    h_AltSig_sys = get_sys(h_nominal,[h_AltSig],"AltSig_%s"%era,plotDir)
+    h_AltBkg_sys = get_sys(h_nominal,[h_AltBkg],"AltBkg_%s"%era,plotDir)
+    h_NLO_sys    = get_sys(h_nominal,[h_NLO],"NLO_%s"%era,plotDir)
+
+    h_sys = [h_pu_sys, h_AltSig_sys, h_AltBkg_sys, h_NLO_sys]
+    tdptbin=array('d',[10,20,35,50,100,200,500])
+    tdptbin_plain=array('d',[1,2,3,4,5,6,7])
+    tdptbinname=['10~20','20~35','35~50','50~100','100~200','200~500']
+    tdetabin=array('d',[0.0,0.8,1.4442,1.566,2.0,2.5])
+
+    nbinX = h_nominal.GetNbinsX()
+    nbinY = h_nominal.GetNbinsY()
+
+    h_sys_combine = ROOT.TH2D('sys_error', 'sys_error', nbinX, tdptbin, nbinY, tdetabin)
+    h_sys_combine_plain = ROOT.TH2D("sys_error_plain", "sys_error_plain", nbinX, tdptbin_plain, nbinY, tdetabin)
+    h_err_combine = ROOT.TH2D("combined_error","combined_error", nbinX, tdptbin, nbinY, tdetabin)
+    h_err_combine_plain = ROOT.TH2D("combined_error_plain", "combined_error_plain", nbinX, tdptbin_plain, nbinY, tdetabin)
+
+    h_sys_combine.SetStats(0)
+    h_sys_combine.GetXaxis().SetTitle('Muon P_{T} [GeV]')
+    h_sys_combine.GetYaxis().SetTitle('Muon #||{#eta}')
+    h_sys_combine.SetTitle('')
+
+    h_sys_combine_plain.SetStats(0)
+    h_sys_combine_plain.GetXaxis().SetTitle('Muon P_{T} [GeV]')
+    h_sys_combine_plain.GetYaxis().SetTitle('Muon #||{#eta}')
+    h_sys_combine_plain.SetTitle('')
+    for ib in range(1,7):
+      h_sys_combine_plain.GetXaxis().SetBinLabel(ib,tdptbinname[ib-1])
+      h_err_combine_plain.GetXaxis().SetBinLabel(ib,tdptbinname[ib-1])
+
+    h_err_combine.SetStats(0)
+    h_err_combine.GetXaxis().SetTitle('Muon P_{T} [GeV]')
+    h_err_combine.GetYaxis().SetTitle('Muon #||{#eta}')
+    h_err_combine.SetTitle('')
+
+    h_err_combine_plain.SetStats(0)
+    h_err_combine_plain.GetXaxis().SetTitle('Muon P_{T} [GeV]')
+    h_err_combine_plain.GetYaxis().SetTitle('Muon #||{#eta}')
+    h_err_combine_plain.SetTitle('')
+
+    for i in range(nbinX):
+      for j in range(nbinY):
+        err_sys = 0.
+        err_stat = 0.
+        for h in h_sys:
+          err_sys += (h.GetBinContent(i+1,j+1))**2
+        err_sys = sqrt(err_sys)
+        err_stat = h_nominal.GetBinError(i+1,j+1)
+        h_sys_combine.SetBinContent(i+1,j+1,err_sys)
+        h_sys_combine_plain.SetBinContent(i+1,j+1,err_sys)
+        h_err_combine.SetBinContent(i+1,j+1,sqrt(err_sys**2+err_stat**2))
+        h_err_combine_plain.SetBinContent(i+1,j+1,sqrt(err_sys**2+err_stat**2))
+
+    c1 = TCanvas()
+    pad1 = TPad()
+    pad1.Draw()
+    pad1.cd()
+    h_sys_combine.Draw('COLZ TEXT E')
+    CMSstyle.SetStyle(pad1)
+    pad1.SetRightMargin(0.15)
+    c1.SetGridx(False);
+    c1.SetGridy(False);
+    c1.SaveAs('%s/sys_combine_%s.png'%(plotDir,era))
+    c1.SaveAs('%s/sys_combine_%s.pdf'%(plotDir,era))
+    h_err_combine.Draw('COLZ TEXT E')
+    c1.SetGridx(False);
+    c1.SetGridy(False);
+    c1.SaveAs('%s/err_combine_%s.png'%(plotDir,era))
+    c1.SaveAs('%s/err_combine_%s.pdf'%(plotDir,era))
+    pad1.Close()
+
+    c2 = TCanvas()
+    pad2 = TPad()
+    pad2.Draw()
+    pad2.cd()
+    h_sys_combine_plain.Draw('COLZ TEXT E')
+    CMSstyle.SetStyle(pad2)
+    pad2.SetRightMargin(0.15)
+    c2.SetGridx(False);
+    c2.SetGridy(False);
+    c2.SaveAs('%s/sys_combine_plainX_%s.png'%(plotDir,era))
+    c2.SaveAs('%s/sys_combine_plainX_%s.pdf'%(plotDir,era))
+    h_err_combine_plain.Draw('COLZ TEXT E')
+    c2.SetGridx(False);
+    c2.SetGridy(False);
+    c2.SaveAs('%s/err_combine_plainX_%s.png'%(plotDir,era))
+    c2.SaveAs('%s/err_combine_plainX_%s.pdf'%(plotDir,era))
+    pad2.Close()
+
+    fout = ROOT.TFile('muonIdSF_%sUL.root'%era,'recreate')
+    fout.cd()
+
+    h_nominal.Write()
+    for h in h_sys:
+      h.Write()
+    h_sys_combine.Write()
+    h_err_combine.Write()
+    fout.Close()
