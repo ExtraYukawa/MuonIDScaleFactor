@@ -29,6 +29,8 @@ python makehist.py --era 2017 --outDir ./ --shift puWeightUp --NLO 0 --ptbin 0 -
 python runCondor.py
 # Check condor process
 condor_q
+# Check all the flatten root files are produced well and rerun the failed files.
+pytohn rerunCondor.py
 ```
 ## Tag and Probe Analysis
 After producing the flatten root files. We can do tag and probe analysis to get muon ID scale factor (ID+ISO SF actually).
